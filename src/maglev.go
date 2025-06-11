@@ -12,6 +12,18 @@ import (
 	"log"
 )
 
+type logMsg struct {
+	Success string
+	Error   string
+	Idle    string
+}
+
+var logMsgCfg = logMsg{
+	Success: "\033[32m[SUCCESS]\033[0m",
+	Error:   "\033[31m[ERROR]\033[0m",
+	Idle:    "\033[34m[IDLE]\033[0m",
+}
+
 func handleError(err error) int {
 	if err != nil {
 		return 1
@@ -26,7 +38,7 @@ func spawnShell(conn net.Conn, shell string) {
 	defer conn.Close()
 	currentUser, err := user.Current()
 	if handleError(err) == 1 {
-		fmt.Fprintf(conn, "🔴 [ERROR] Unable to get current user: %v\n", err)
+		fmt.Fprintf(conn, logMsgCfg.Error + "Unable to get current user: %v\n", err)
 		return
 	}
 
@@ -37,7 +49,7 @@ func spawnShell(conn net.Conn, shell string) {
 		return
 	}
 
-	fmt.Printf("🟢 [SUCCESS] Received connection from %v\n", ip)
+	fmt.Printf(logMsgCfg.Success + "Received connection from %v\n", ip)
 	conn.Write([]byte("🚅 Connection established!\n"))
 	conn.Write([]byte("⚙️ SHELL: " + shell + "\n"))
 	conn.Write([]byte("⚙️ USER: " + username + "\n"))
@@ -45,7 +57,7 @@ func spawnShell(conn net.Conn, shell string) {
 
 	dir, err := os.Getwd()
 	if handleError(err) == 1 {
-		fmt.Fprintf(conn, "🔴 [ERROR] Unable to get current directory: %v\n", err)
+		fmt.Fprintf(conn, logMsgCfg.Error + "Unable to get current directory: %v\n", err)
 		return
 	}
 
@@ -56,7 +68,7 @@ func spawnShell(conn net.Conn, shell string) {
 		n, err := conn.Read(input)
 
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Could not read input from client: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not read input from client: %v\n", err)
 			return
 		}
 
@@ -64,7 +76,7 @@ func spawnShell(conn net.Conn, shell string) {
 
 		if command == "exit" {
 			conn.Write([]byte("👋 Bye!\n"))
-			fmt.Printf("🟢 [SUCCESS] Connection from %v successfully closed\n", ip)
+			fmt.Printf(logMsgCfg.Success + "Connection from %v successfully closed\n", ip)
 			return
 		}
 
@@ -72,8 +84,8 @@ func spawnShell(conn net.Conn, shell string) {
 			path := strings.TrimSpace(command[3:])
 			err := os.Chdir(path)
 			if handleError(err) == 1 {
-				fmt.Fprintf(conn, "🔴 [ERROR] Unable to change directory: %v\n", err)
-				fmt.Printf("🔴 [ERROR] Client is unnable to change directory: %v\n", err)
+				fmt.Fprintf(conn, logMsgCfg.Error + "Unable to change directory: %v\n", err)
+				fmt.Printf(logMsgCfg.Error + "Client is unnable to change directory: %v\n", err)
 			} else {
 				dir, _ = os.Getwd()
 			}
@@ -82,7 +94,7 @@ func spawnShell(conn net.Conn, shell string) {
 
 		dir, err = os.Getwd()
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Could not update directory: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not update directory: %v\n", err)
 		}
 
 		cmd := exec.Command(shell, "-c", command)
@@ -90,8 +102,8 @@ func spawnShell(conn net.Conn, shell string) {
 		cmd.Stdout = conn
 		cmd.Stderr = conn
 		if err := cmd.Run(); handleError(err) == 1 {
-			fmt.Fprintf(conn, "🔴 [ERROR] Unable to execute commands: %v\n", err)
-			fmt.Printf("🔴 [ERROR] Client is unnable to execute commands: %v\n", err)
+			fmt.Fprintf(conn, logMsgCfg.Error + "Unable to execute commands: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Client is unnable to execute commands: %v\n", err)
 		}
 	}
 }
@@ -101,14 +113,14 @@ func spawnComm(conn net.Conn) {
 	ip := addrInfo[0]
 	defer conn.Close()
 
-	fmt.Printf("🟢 [SUCCESS] Received connection from %v\n", ip)
+	fmt.Printf(logMsgCfg.Success + "Received connection from %v\n", ip)
 	conn.Write([]byte("🚅 Connection established!\n"))
 
 	for {
 		input := make([]byte, 1024)
 		n, err := conn.Read(input)
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Could not read input from client: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not read input from client: %v\n", err)
 			return
 		}
 
@@ -117,7 +129,7 @@ func spawnComm(conn net.Conn) {
 
 		if msg == "exit" {
 			conn.Write([]byte("👋 Bye!\n"))
-			fmt.Printf("🟢 [SUCCESS] Connection from %v successfully closed\n", ip)
+			fmt.Printf(logMsgCfg.Success + "Connection from %v successfully closed\n", ip)
 			return
 		}
 	}
@@ -126,18 +138,18 @@ func spawnComm(conn net.Conn) {
 func listenShell(PORT string, SHELL string) {
 	ln, err := net.Listen("tcp", ":"+PORT)
 	if handleError(err) == 1 {
-		fmt.Printf("🔴 [ERROR] Unable to listen on specified port: %v\n", err)
+		fmt.Printf("[ERROR] Unable to listen on specified port: %v\n", err)
 		return
 	} else {
-		fmt.Printf("🟡 [IDLE] Listening on port %s\n", PORT)
+		fmt.Printf(logMsgCfg.Idle + "Listening on port %s\n", PORT)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Unable to establish connection: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Unable to establish connection: %v\n", err)
 		} else {
-			fmt.Printf("🟢 [SUCCESS] Connection established\n")
+			fmt.Printf(logMsgCfg.Success + "Connection established\n")
 		}
 		go spawnShell(conn, SHELL)
 	}
@@ -153,17 +165,17 @@ func listenShellTLS(PORT string, SHELL string, keyfile string, certfile string) 
 
 	ln, err := tls.Listen("tcp", ":"+PORT, config)
 	if handleError(err) == 1 {
-		fmt.Printf("🔴 [ERROR] Unable to listen on specified port: %v\n", err)
+		fmt.Printf(logMsgCfg.Error + "Unable to listen on specified port: %v\n", err)
 		return
 	} else {
-		fmt.Printf("🟡 [IDLE] Listening on port %s\n", PORT)
+		fmt.Printf(logMsgCfg.Idle + "Listening on port %s\n", PORT)
 	}
 	for {
 		conn, err := ln.Accept()
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Unable to establish connection: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Unable to establish connection: %v\n", err)
 		} else {
-			fmt.Printf("🟢 [SUCCESS] Connection established\n")
+			fmt.Printf(logMsgCfg.Success + "Connection established\n")
 		}
 		go spawnShell(conn, SHELL)
 	}
@@ -172,18 +184,18 @@ func listenShellTLS(PORT string, SHELL string, keyfile string, certfile string) 
 func listen(PORT string) {
 	ln, err := net.Listen("tcp", ":"+PORT)
 	if handleError(err) == 1 {
-		fmt.Printf("🔴 [ERROR] Unable to listen on specified port: %v\n", err)
+		fmt.Printf(logMsgCfg.Error + "Unable to listen on specified port: %v\n", err)
 		return
 	} else {
-		fmt.Printf("🟡 [IDLE] Listening on port %s\n", PORT)
+		fmt.Printf(logMsgCfg.Idle + "Listening on port %s\n", PORT)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Unable to establish connection: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Unable to establish connection: %v\n", err)
 		} else {
-			fmt.Printf("🟢 [SUCCESS] Connection established\n")
+			fmt.Printf(logMsgCfg.Success + "Connection established\n")
 		}
 		go spawnComm(conn)
 	}
@@ -199,18 +211,18 @@ func listenTLS(PORT string, keyfile string, certfile string) {
 
 	ln, err := tls.Listen("tcp", ":"+PORT, config)
 	if handleError(err) == 1 {
-		fmt.Printf("🔴 [ERROR] Unable to listen on specified port: %v\n", err)
+		fmt.Printf(logMsgCfg.Error + "Unable to listen on specified port: %v\n", err)
 		return
 	} else {
-		fmt.Printf("🟡 [IDLE] Listening on port %s\n", PORT)
+		fmt.Printf(logMsgCfg.Idle + "Listening on port %s\n", PORT)
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if handleError(err) == 1 {
-			fmt.Printf("🔴 [ERROR] Unable to establish connection: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Unable to establish connection: %v\n", err)
 		} else {
-			fmt.Printf("🟢 [SUCCESS] Connection established\n")
+			fmt.Printf(logMsgCfg.Success + "Connection established\n")
 		}
 		go spawnComm(conn)
 	}
@@ -219,19 +231,19 @@ func listenTLS(PORT string, keyfile string, certfile string) {
 func connectPayload(IP string, PORT string, payload string) {
 	conn, err := net.Dial("tcp", IP+":"+PORT)
 	if err != nil {
-		fmt.Printf("🔴 [ERROR] Unable to connect to %v on port %v: %v\n", IP, PORT, err)
+		fmt.Printf(logMsgCfg.Error + "Unable to connect to %v on port %v: %v\n", IP, PORT, err)
 		return
 	}
 	defer conn.Close()
 
-	fmt.Printf("🟢 [SUCCESS] Successfully connected to %v on port %v\n", IP, PORT)
+	fmt.Printf(logMsgCfg.Success + "Successfully connected to %v on port %v\n", IP, PORT)
 
 	go func() {
 		reader := bufio.NewReader(conn)
 		for {
 			message, err := reader.ReadString(' ')
 			if err != nil {
-				fmt.Printf("🔴 [ERROR] Failed to read message: %v\n", err)
+				fmt.Printf(logMsgCfg.Error + "Failed to read message: %v\n", err)
 				return
 			}
 			fmt.Printf(message)
@@ -245,7 +257,7 @@ func connectPayload(IP string, PORT string, payload string) {
 			deployment = 1
 		}
 		if err != nil {
-			fmt.Printf("🔴 [ERROR] Could not send payload: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not send payload: %v\n", err)
 			continue
 		}
 	}
@@ -254,19 +266,19 @@ func connectPayload(IP string, PORT string, payload string) {
 func connect(IP string, PORT string) {
 	conn, err := net.Dial("tcp", IP+":"+PORT)
 	if err != nil {
-		fmt.Printf("🔴 [ERROR] Unable to connect to %v on port %v: %v\n", IP, PORT, err)
+		fmt.Printf(logMsgCfg.Error + "Unable to connect to %v on port %v: %v\n", IP, PORT, err)
 		return
 	}
 	defer conn.Close()
 
-	fmt.Printf("🟢 [SUCCESS] Successfully connected to %v on port %v\n", IP, PORT)
+	fmt.Printf(logMsgCfg.Success + "Successfully connected to %v on port %v\n", IP, PORT)
 
 	go func() {
 		reader := bufio.NewReader(conn)
 		for {
 			message, err := reader.ReadString(' ')
 			if err != nil {
-				fmt.Printf("🔴 [ERROR] Failed to read message: %v\n", err)
+				fmt.Printf(logMsgCfg.Error + "Failed to read message: %v\n", err)
 				return
 			}
 			fmt.Printf(message)
@@ -277,19 +289,19 @@ func connect(IP string, PORT string) {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("🔴 [ERROR] Could not read input: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not read input: %v\n", err)
 			continue
 		}
 
 		input = strings.TrimSpace(input)
 		if input == "exit" {
-			fmt.Printf("🟢 [SUCCESS] Client has disconnected\n")
+			fmt.Printf(logMsgCfg.Success + "Client has disconnected\n")
 			return
 		}
 
 		_, err = conn.Write([]byte(input + "\n"))
 		if err != nil {
-			fmt.Printf("🔴 [ERROR] Could not send input: %v\n", err)
+			fmt.Printf(logMsgCfg.Error + "Could not send input: %v\n", err)
 			continue
 		}
 	}
@@ -317,52 +329,54 @@ func help() {
 }
 
 func main() {
-	if len(os.Args) > 1 {
-		if strings.Compare(os.Args[1], "-l") == 0 {
-			if len(os.Args) > 3 && strings.Compare(os.Args[3], "--shell") == 0 {
-				shell := os.Args[4]
-				if len(os.Args) > 4 && strings.Compare(os.Args[4], "--tls") == 0 {
-					listenShellTLS(os.Args[2], shell, os.Args[6], os.Args[7])
-				} else {
-					listenShell(os.Args[2], shell)
-				}
-			} else {
-				if len(os.Args) > 3 && strings.Compare(os.Args[3], "--tls") == 0 {
-					listenTLS(os.Args[2], os.Args[4], os.Args[5])
-				}
-				listen(os.Args[2])
-			}
-		} else if len(os.Args) > 3 && strings.Compare(os.Args[1], "-c") == 0 {
-			if len(os.Args) > 4 {
-				if strings.Compare(os.Args[4], "--payload") == 0 {
-					payload := os.Args[5]
-					var ipAddr string
-					if strings.Compare(os.Args[2], "localhost") == 0 {
-						ipAddr = "127.0.0.1"
-					} else {
-						ipAddr = os.Args[2]
-					}
-					Port := os.Args[3]
-					connectPayload(ipAddr, Port, payload)
-				} else {
-					help()
-				}
-			} else {
-				var ipAddr string
-				if strings.Compare(os.Args[2], "localhost") == 0 {
-					ipAddr = "127.0.0.1"
-				} else {
-					ipAddr = os.Args[2]
-				}
-				Port := os.Args[3]
-				connect(ipAddr, Port)
-			}
-		} else if strings.Compare(os.Args[1], "-h") == 0 {
-			help()
-		} else {
-			help()
-		}
-	} else {
+	if len(os.Args) <= 1 {
 		help()
+		return
+	}
+
+	switch os.Args[1] {
+		case "-l":
+			if len(os.Args) < 3 {
+				help()
+				return
+			}
+			switch {
+				case len(os.Args) > 4 && os.Args[3] == "--shell":
+					shell := os.Args[4]
+					switch {
+					case len(os.Args) > 6 && os.Args[5] == "--tls":
+						listenShellTLS(os.Args[2], shell, os.Args[6], os.Args[7])
+					default:
+						listenShell(os.Args[2], shell)
+					}
+				case len(os.Args) > 5 && os.Args[3] == "--tls":
+					listenTLS(os.Args[2], os.Args[4], os.Args[5])
+				default:
+					listen(os.Args[2])
+			}
+
+		case "-c":
+			if len(os.Args) < 4 {
+				help()
+				return
+			}
+			ipAddr := os.Args[2]
+			if ipAddr == "localhost" {
+				ipAddr = "127.0.0.1"
+			}
+			port := os.Args[3]
+
+			switch {
+				case len(os.Args) > 5 && os.Args[4] == "--payload":
+					connectPayload(ipAddr, port, os.Args[5])
+				default:
+					connect(ipAddr, port)
+			}
+
+		case "-h":
+			help()
+
+		default:
+			help()
 	}
 }
